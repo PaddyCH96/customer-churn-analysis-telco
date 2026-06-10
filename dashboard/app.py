@@ -100,7 +100,7 @@ with tab1:
         title="Churn rate by contract"
     )
     fig.update_layout(yaxis_tickformat=".0%")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     by_payment = (
         f.groupby("PaymentMethod", as_index=False)
@@ -118,7 +118,7 @@ with tab1:
         title="Churn rate by payment method"
     )
     fig.update_layout(xaxis_tickangle=-20, yaxis_tickformat=".0%")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 with tab2:
     st.subheader("Churn over customer tenure")
@@ -152,7 +152,7 @@ with tab2:
         title="Churn rate by tenure bucket"
     )
     fig.update_layout(yaxis_tickformat=".0%")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 with tab3:
     st.subheader("Where revenue risk concentrates")
@@ -176,7 +176,7 @@ with tab3:
         labels={"revenue_at_risk": "Monthly revenue at risk ($)"},
         title="Monthly revenue at risk by contract"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.subheader("Top churn-risk segments")
 
@@ -194,10 +194,10 @@ with tab3:
     seg["churn_rate"] = seg["churn_rate"].map(lambda x: f"{x*100:.1f}%")
     seg["revenue_at_risk"] = seg["revenue_at_risk"].map(lambda x: f"${x:,.0f}")
 
-    st.dataframe(seg, use_container_width=True)
+    st.dataframe(seg, width='stretch')
 
 st.divider()
 
 with st.expander("Show filtered data (sample)"):
-    st.dataframe(f.head(50), use_container_width=True)
+    st.dataframe(f.head(50), width='stretch')
 
