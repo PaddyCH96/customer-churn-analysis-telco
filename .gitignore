@@ -1,18 +1,46 @@
-# Python
+# Python / virtual environments
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+
+venv/
+.env/
 .venv/
+ENV/
+env/
 
-# Jupyter
+# Jupyter / IPython
 .ipynb_checkpoints/
-notebooks/
+*.nbconvert.ipynb
 
-# Models / artifacts
-reports/*.pkl
-reports/*.csv
+# Data / model artefacts – keep them out of Git
+reports/
+data/
+models/
+*.pkl
+*.h5
+*.hdf5
+*.csv
+*.tsv
+*.parquet
 
-# OS
+# IDE / editor files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS artefacts
 .DS_Store
+Thumbs.db
 
-# Env files
-.env
+# Sensitive files (if you ever create them)
+*.pem
+*.key
+*.env
