@@ -1,8 +1,8 @@
 SELECT
   CASE
-    WHEN tenure < 6 THEN '0-6 months'
-    WHEN tenure < 12 THEN '6-12 months'
-    WHEN tenure < 24 THEN '12-24 months'
+    WHEN tenure < 6 THEN '0-5 months'
+    WHEN tenure < 12 THEN '6-11 months'
+    WHEN tenure < 24 THEN '12-23 months'
     ELSE '24+ months'
   END AS tenure_bucket,
   COUNT(*) AS customers,

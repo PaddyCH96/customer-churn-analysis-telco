@@ -1,176 +1,49 @@
-# Predictive Churn Model - Quick Start Guide
+# Model training and inference
 
-## What You Have
-
-After running `Predictive_Churn_Model.ipynb`, you now have:
-
-### **Customer Risk Scores** (`customer_churn_risk_scores.csv`)
-- **7,043 customers** scored by churn risk
-- **Columns:** customerID, tenure, monthly/total charges, contract, payment method, internet service, tech support, online security, churn (actual), churn_probability, risk_tier, engagement_score, recommended_actions
-
-### **Risk Tier Breakdown**
-| Tier | Count | % | Churn Prob | Churn Rate | Action |
-|------|-------|---|-----------|-----------|--------|
-| **Critical** | 1,508 | 21% | 50-90% | 66% | Retention specialists (ASAP) |
-| **High** | 828 | 12% | 35-50% | 41% | Proactive outreach |
-| **Medium** | 1,067 | 15% | 20-35% | 27% | Email campaigns |
-| **Low** | 3,640 | 52% | <20% | 7% | Standard engagement |
-
-### **Trained Models** 
-- `best_churn_model.pkl` - Logistic Regression (ROC AUC: 0.8418)
-- `feature_scaler.pkl` - Feature preprocessing (required for predictions)
-
----
-
-## How to Use the Risk Scores
-
-### **Option 1: Import to CRM/Retention Platform**
+## Generate the complete model
 
 ```bash
-# 1. Open the CSV
-open reports/customer_churn_risk_scores.csv
-
-# 2. Sort by risk_tier (Critical first)
-
-# 3. Filter for Critical Risk tier (1,508 customers)
-# These have highest ROI for interventions
-
-# 4. For each customer, use "recommended_actions" column
-# Example:
-# - Customer 5178-LMXOP (Critical): 
-#   "URGENT: Proactive outreach by retention specialist | 
-#    - Launch first-6-months onboarding program |
-#    - Offer 30% discount on 1-year contract |
-#    - Bundle Tech Support + Online Security (50% off) |
-#    - Auto-pay setup incentive ($10 credit)"
+python -m pip install -e ".[dev]"
+python -m telco_churn download
+python -m telco_churn train
 ```
 
-### **Option 2: Python Script for Automation**
+Outputs in `reports/`:
 
-```python
-import pandas as pd
+- `churn_pipeline.joblib`: one-hot encoders, numeric imputer, scaler, and selected estimator together.
+- `model_metrics.json`: training-only CV results, final holdout metrics, seed, dataset checksum, and versions.
+- `holdout_predictions.csv`: predictions on the untouched evaluation subset.
+- `customer_churn_risk_scores.csv`: all customers scored, with tiers, modeled monthly exposure, and suggested actions. This file includes training customers; do not use it to estimate generalization.
 
-# Load scores
-scores = pd.read_csv('reports/customer_churn_risk_scores.csv')
+The old `best_churn_model.pkl` and `feature_scaler.pkl` files are obsolete and are not used by this workflow. Retrain to generate a complete pipeline.
 
-# Get Critical Risk customers
-critical = scores[scores['risk_tier'] == 'Critical']
-print(f"Critical Risk: {len(critical)} customers")
+## Score new records
 
-# Export for retention team
-critical.to_csv('critical_targets.csv', index=False)
+Use a CSV with the same original 19 customer feature columns. The target Churn is optional. Unknown categorical values are supported; malformed numeric values and missing feature columns are rejected.
 
-# Get high-value at-risk (high spend + high risk)
-high_value_risk = scores[
-    (scores['risk_tier'].isin(['Critical', 'High'])) & 
-    (scores['MonthlyCharges'] > 80)
-]
-print(f"High-Value At Risk: {len(high_value_risk)} customers")
+```bash
+python -m telco_churn score --data /path/to/customers.csv --model reports/churn_pipeline.joblib --output /path/to/scoring-output
 ```
 
-### **Option 3: Filter by Behavior**
+Or call the shared Python API:
 
-```python
-# Early churn risk (new customers in first 6 months)
-early_risk = scores[(scores['tenure'] < 6) & (scores['risk_tier'].isin(['Critical', 'High']))]
-
-# Payment friction (electronic check users at risk)
-payment_friction = scores[(scores['PaymentMethod'] == 'Electronic check') & (scores['risk_tier'] == 'Critical')]
-
-# No support services (untapped opportunity)
-no_support = scores[(scores['TechSupport'] == 'No') & (scores['OnlineSecurity'] == 'No') & (scores['risk_tier'] != 'Low')]
-```
-
----
-
-## Expected Outcomes
-
-### **Model Accuracy**
-- **ROC AUC: 0.8418** - Excellent discrimination between churners and non-churners
-- **Precision: 64.5%** - Of customers predicted to churn, 64.5% actually churned
-- **Recall: 54%** - of actual churners, model catches 54%
-
-### **If You Execute Interventions by Risk Tier**
-
-| Risk Tier | Intervention | Expected Effect | Revenue Saved |
-|-----------|--------------|-----------------|---------------|
-| Critical | Retention specialist + offers | -40% churn | ~$48k/month |
-| High | Proactive outreach + bundle | -25% churn | ~$15k/month |
-| Medium | Email campaigns | -15% churn | ~$10k/month |
-| Low | Standard communication | -5% churn | ~$10k/month |
-| **TOTAL** | Targeted campaigns | **~$83k/month saved** | **ROI: 300%+** |
-
-**Cost to Execute:** ~$20k (varies by channel)
-
----
-
-## Next Steps
-
-### **Immediate (This Week)**
-1. ✅ Run the notebook and generate scores
-2. ✅ Extract Critical Risk tier (1,508 customers)
-3. ✅ Review top 20 customers - are they ones you'd expect to churn?
-4. ✅ Validate model (manual spot checks)
-
-### **Short-term (This Month)**
-1. 🎯 Launch campaign for Critical Risk (expect 40% churn reduction)
-2. 📊 Track actual results vs predictions
-3. 📈 Measure revenue saved
-4. 🔄 Adjust intervention strategies based on early results
-
-### **Medium-term (Next Quarter)**
-1. 📅 Retrain model with new data (captures seasonal trends)
-2. 🎯 Expand to High Risk tier interventions
-3. 💰 Calculate total ROI
-4. 🚀 Scale successful interventions
-
-### **Ongoing**
-1. Score new customers manually or automate scoring pipeline
-2. Monitor model performance (recalibrate if needed)
-3. A/B test different interventions on similar risk segments
-4. Quarterly model retraining
-
----
-
-## Troubleshooting
-
-### **Q: Why does the model say high churn probability but customer hasn't actually churned?**
-A: The model predicts *probability* of future churn based on current characteristics. This is exactly why you should intervene now - to prevent that predicted churn.
-
-### **Q: How often should I retrain the model?**
-A: Monthly or quarterly. Retrain whenever:
-- You have 200+ new customers
-- Intervention strategies change
-- Business model changes (new pricing, services, etc.)
-- Model accuracy starts drifting
-
-### **Q: Can I use this model for new customers at signup?**
-A: Yes! After running the model:
 ```python
 import joblib
-from sklearn.preprocessing import StandardScaler
+import pandas as pd
+from telco_churn.model import score
 
-# Load saved model and scaler
-model = joblib.load('best_churn_model.pkl')
-scaler = joblib.load('feature_scaler.pkl')
-
-# For new customer features, predict churn probability
-churn_prob = model.predict_proba(scaler.transform(new_customer_features))[0, 1]
+pipeline = joblib.load('reports/churn_pipeline.joblib')
+scores = score(pipeline, pd.read_csv('/path/to/customers.csv'))
 ```
 
-### **Q: My interventions aren't working. What now?**
-A: 
-1. Verify model is predicting correctly (see validation in notebook)
-2. Try different offers/channels for same risk tier
-3. Retrain model - maybe something has changed
-4. Consider external factors (pricing changes, competitor activity, etc.)
+Use artifacts produced by your own training run and the same scikit-learn version recorded in its metrics. Joblib loading executes Python deserialization; load only trusted artifacts. The installed `telco_churn` package must be available.
 
----
+## Operational interpretation
 
-## Questions?
+Risk thresholds are illustrative: Critical ≥50%, High ≥35%, Medium ≥20%, Low <20%. Validate thresholds, calibration, business costs, and a prospective prediction horizon before operational use. This historical dataset does not establish that the model works at customer signup.
 
-Refer back to `Predictive_Churn_Model.ipynb` sections:
-- **Section 4-6:** Model details & feature importance
-- **Section 7:** How risk tiers are defined
-- **Section 8:** Intervention strategies and ROI calculations
-- **Section 9:** Customer scoring methodology
+`modeled_monthly_exposure` is the row's monthly charge multiplied by its model score. Sum rows to obtain portfolio exposure. It is distinct from the observed charges of customers who already churned. Do not infer causal retention effects from correlations.
+
+Campaign scenarios accept explicit retention-lift and cost assumptions. They compare assumed first-month savings against one-time campaign costs. No guaranteed savings, intervention effectiveness, or measured ROI is claimed. Validate suggested offers through controlled experiments.
+
+The Streamlit dashboard displays historical analysis; it does not perform model inference. Use the CLI or API above for scoring. See `docs/model_metrics.json` for the verified reference evaluation rather than relying on fixed risk-tier counts or historical example claims.

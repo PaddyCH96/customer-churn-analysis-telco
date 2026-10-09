@@ -1,42 +1,30 @@
-import duckdb
 import pandas as pd
-import streamlit as st
 import plotly.express as px
+import streamlit as st
 
 st.set_page_config(page_title="Telco Churn Dashboard", layout="wide")
 
+from telco_churn.data import DATA_PATH, DATA_URL, clean_data, load_data
+
+
 @st.cache_data
 def load_df():
-    url = "https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv"
-    con = duckdb.connect(database=":memory:")
-
-    df = con.execute(f"""
-        SELECT
-          *,
-          TRY_CAST(NULLIF(TotalCharges, ' ') AS DOUBLE) AS TotalCharges_num
-        FROM read_csv_auto('{url}', HEADER=TRUE)
-    """).df()
-
-    # Normalize churn into a boolean column
-    s = df["Churn"]
-    if s.dtype == bool:
-        df["churned"] = s
-    else:
-        df["churned"] = (
-            s.astype(str).str.strip().str.lower().isin(["yes", "true", "1"])
-        )
-
-    # Clean whitespace in categoricals
-    for col in ["Contract", "PaymentMethod", "InternetService", "TechSupport", "OnlineSecurity"]:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
-
+    df = load_data() if DATA_PATH.exists() else clean_data(pd.read_csv(DATA_URL))
+    df["churned"] = df["Churn"].astype(bool)
     return df
 
-df = load_df()
+
+try:
+    df = load_df()
+except (OSError, ValueError) as exc:
+    st.error(f"Unable to load dataset: {exc}. Run python -m telco_churn download.")
+    st.stop()
+
 
 st.title("Customer Churn & Revenue Risk Dashboard")
-st.caption("Business-first view of churn drivers and monthly revenue at risk (IBM Telco dataset).")
+st.caption(
+    "Business-first view of churn drivers and monthly charges associated with observed churn (IBM Telco dataset)."
+)
 
 # ---------------- Sidebar filters ----------------
 st.sidebar.header("Filters")
@@ -47,7 +35,9 @@ internet_opts = sorted(df["InternetService"].dropna().unique().tolist())
 
 contract = st.sidebar.multiselect("Contract", contract_opts, default=contract_opts)
 payment = st.sidebar.multiselect("Payment Method", payment_opts, default=payment_opts)
-internet = st.sidebar.multiselect("Internet Service", internet_opts, default=internet_opts)
+internet = st.sidebar.multiselect(
+    "Internet Service", internet_opts, default=internet_opts
+)
 
 tenure_max = int(df["tenure"].max())
 tenure_range = st.sidebar.slider("Tenure (months)", 0, tenure_max, (0, tenure_max))
@@ -74,7 +64,11 @@ k1, k2, k3, k4 = st.columns(4)
 k1.metric("Customers", f"{customers:,}")
 k2.metric("Churn rate", f"{churn_rate*100:.1f}%")
 k3.metric("Churned customers", f"{churned:,}")
-k4.metric("Monthly revenue at risk", f"${rev_at_risk:,.0f}")
+k4.metric("Monthly charges of churned customers", f"${rev_at_risk:,.0f}")
+
+st.caption(
+    "Historical exposure: sum of monthly charges for customers labelled as churned. This is not a forecast or causal estimate."
+)
 
 st.divider()
 
@@ -86,8 +80,8 @@ with tab1:
 
     by_contract = (
         f.groupby("Contract", as_index=False)
-         .agg(customers=("customerID", "count"), churn_rate=("churned", "mean"))
-         .sort_values("churn_rate", ascending=False)
+        .agg(customers=("customerID", "count"), churn_rate=("churned", "mean"))
+        .sort_values("churn_rate", ascending=False)
     )
 
     fig = px.bar(
@@ -97,15 +91,15 @@ with tab1:
         text=by_contract["churn_rate"].map(lambda x: f"{x*100:.1f}%"),
         hover_data={"customers": True, "churn_rate": ":.3f"},
         labels={"churn_rate": "Churn rate"},
-        title="Churn rate by contract"
+        title="Churn rate by contract",
     )
     fig.update_layout(yaxis_tickformat=".0%")
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
     by_payment = (
         f.groupby("PaymentMethod", as_index=False)
-         .agg(customers=("customerID", "count"), churn_rate=("churned", "mean"))
-         .sort_values("churn_rate", ascending=False)
+        .agg(customers=("customerID", "count"), churn_rate=("churned", "mean"))
+        .sort_values("churn_rate", ascending=False)
     )
 
     fig = px.bar(
@@ -115,31 +109,32 @@ with tab1:
         text=by_payment["churn_rate"].map(lambda x: f"{x*100:.1f}%"),
         hover_data={"customers": True, "churn_rate": ":.3f"},
         labels={"churn_rate": "Churn rate"},
-        title="Churn rate by payment method"
+        title="Churn rate by payment method",
     )
     fig.update_layout(xaxis_tickangle=-20, yaxis_tickformat=".0%")
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
 with tab2:
     st.subheader("Churn over customer tenure")
 
     def bucket(t):
         if t < 6:
-            return "0–6"
+            return "0–5"
         if t < 12:
-            return "6–12"
+            return "6–11"
         if t < 24:
-            return "12–24"
+            return "12–23"
         return "24+"
 
     f["tenure_bucket"] = f["tenure"].apply(bucket)
 
-    order = ["0–6", "6–12", "12–24", "24+"]
-    by_tenure = (
-        f.groupby("tenure_bucket", as_index=False)
-         .agg(customers=("customerID", "count"), churn_rate=("churned", "mean"))
+    order = ["0–5", "6–11", "12–23", "24+"]
+    by_tenure = f.groupby("tenure_bucket", as_index=False).agg(
+        customers=("customerID", "count"), churn_rate=("churned", "mean")
     )
-    by_tenure["tenure_bucket"] = pd.Categorical(by_tenure["tenure_bucket"], categories=order, ordered=True)
+    by_tenure["tenure_bucket"] = pd.Categorical(
+        by_tenure["tenure_bucket"], categories=order, ordered=True
+    )
     by_tenure = by_tenure.sort_values("tenure_bucket")
 
     fig = px.line(
@@ -149,10 +144,10 @@ with tab2:
         markers=True,
         hover_data={"customers": True, "churn_rate": ":.3f"},
         labels={"tenure_bucket": "Tenure bucket (months)", "churn_rate": "Churn rate"},
-        title="Churn rate by tenure bucket"
+        title="Churn rate by tenure bucket",
     )
     fig.update_layout(yaxis_tickformat=".0%")
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
 with tab3:
     st.subheader("Where revenue risk concentrates")
@@ -161,43 +156,50 @@ with tab3:
 
     by_contract_risk = (
         f.groupby("Contract", as_index=False)
-         .agg(customers=("customerID", "count"),
-              churned=("churned", "sum"),
-              revenue_at_risk=("risk", "sum"),
-              churn_rate=("churned", "mean"))
-         .sort_values("revenue_at_risk", ascending=False)
+        .agg(
+            customers=("customerID", "count"),
+            churned=("churned", "sum"),
+            revenue_at_risk=("risk", "sum"),
+            churn_rate=("churned", "mean"),
+        )
+        .sort_values("revenue_at_risk", ascending=False)
     )
 
     fig = px.bar(
         by_contract_risk,
         x="Contract",
         y="revenue_at_risk",
-        hover_data={"customers": True, "churned": True, "churn_rate": ":.3f", "revenue_at_risk": ":.2f"},
-        labels={"revenue_at_risk": "Monthly revenue at risk ($)"},
-        title="Monthly revenue at risk by contract"
+        hover_data={
+            "customers": True,
+            "churned": True,
+            "churn_rate": ":.3f",
+            "revenue_at_risk": ":.2f",
+        },
+        labels={"revenue_at_risk": "Monthly charges of churned customers ($)"},
+        title="Monthly charges of churned customers by contract",
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Top churn-risk segments")
+    st.subheader("Segments with the highest observed churn")
+
+    seg = f.groupby(["Contract", "PaymentMethod"], as_index=False).agg(
+        customers=("customerID", "count"),
+        churn_rate=("churned", "mean"),
+        revenue_at_risk=("risk", "sum"),
+    )
 
     seg = (
-        f.groupby(["Contract", "PaymentMethod"], as_index=False)
-         .agg(customers=("customerID", "count"),
-              churn_rate=("churned", "mean"),
-              revenue_at_risk=("risk", "sum"))
+        seg[seg["customers"] >= 200]
+        .sort_values(["churn_rate", "revenue_at_risk"], ascending=False)
+        .head(10)
     )
-
-    seg = seg[seg["customers"] >= 200].sort_values(
-        ["churn_rate", "revenue_at_risk"], ascending=False
-    ).head(10)
 
     seg["churn_rate"] = seg["churn_rate"].map(lambda x: f"{x*100:.1f}%")
     seg["revenue_at_risk"] = seg["revenue_at_risk"].map(lambda x: f"${x:,.0f}")
 
-    st.dataframe(seg, width='stretch')
+    st.dataframe(seg, width="stretch")
 
 st.divider()
 
 with st.expander("Show filtered data (sample)"):
-    st.dataframe(f.head(50), width='stretch')
-
+    st.dataframe(f.head(50), width="stretch")

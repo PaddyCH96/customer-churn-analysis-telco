@@ -1,0 +1,36 @@
+{
+  "best_model": "Gradient Boosting",
+  "selection": "5-fold training-only cross-validation ROC AUC",
+  "seed": 42,
+  "training_customers": 5634,
+  "test_customers": 1409,
+  "candidates": [
+    {
+      "model": "Logistic Regression",
+      "cv_roc_auc_mean": 0.8461368989751807,
+      "cv_roc_auc_std": 0.012544801632456264
+    },
+    {
+      "model": "Random Forest",
+      "cv_roc_auc_mean": 0.8413725302068391,
+      "cv_roc_auc_std": 0.009206424941533524
+    },
+    {
+      "model": "Gradient Boosting",
+      "cv_roc_auc_mean": 0.847842955499653,
+      "cv_roc_auc_std": 0.01215223845330935
+    }
+  ],
+  "holdout": {
+    "roc_auc": 0.8433620088351547,
+    "accuracy": 0.8062455642299503,
+    "precision": 0.6735395189003437,
+    "recall": 0.5240641711229946,
+    "f1": 0.5894736842105263
+  },
+  "dataset_sha256": "16320c9c1ec72448db59aa0a26a0b95401046bef5d02fd3aeb906448e3055e91",
+  "versions": {
+    "scikit-learn": "1.6.1",
+    "pandas": "2.3.3"
+  }
+}

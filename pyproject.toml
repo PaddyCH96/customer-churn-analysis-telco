@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telco-churn"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["pandas>=2.2,<3", "numpy>=1.26,<3", "scikit-learn>=1.6,<1.7", "joblib>=1.4,<2", "duckdb>=1.4,<2", "streamlit>=1.53,<2", "plotly>=6,<7", "matplotlib>=3.9,<4", "seaborn>=0.13,<1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff>=0.9,<1", "black>=25,<27", "jupyter>=1,<2", "nbclient>=0.10,<1", "nbconvert>=7,<8", "ipykernel>=6,<8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
